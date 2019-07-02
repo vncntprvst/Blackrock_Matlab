@@ -123,6 +123,18 @@ pause(0.1)
 handles.channelList = [continuousData{:,1}];
 % set channel popup meno to hold channels
 set(handles.pop_channels,'String',handles.channelList);
+%% add some info
+[handles.rawSamplingRate,handles.continuousSamplingRate]=deal(30000);
+handles.AIN_SamplingRate=1000;
+handles.electrodeChannels=handles.channelList(handles.channelList <= 64);
+% keep information about channels and set new values
+handles.initalChanConfig=cell(numel(handles.channelList),1);
+for chanNum=1:numel(handles.channelList)
+    handles.initalChanConfig{chanNum} = cbmex('config', handles.channelList(chanNum));
+    if ismember(handles.channelList(chanNum),handles.electrodeChannels) % if electrode channel, set 30kHz sampling rate and 250Hz-5kHz Band pass
+        cbmex('config', handles.channelList(chanNum),'smpgroup',5,'smpfilter',12);
+    end
+end
 
 guidata(hObject,handles)
 
@@ -286,33 +298,41 @@ try
     if strcmp(handles.cbmexStatus,'closed')
         stop(handles.timer)
     end
-    
-    [events, time, continuousData] = cbmex('trialdata',1);
-    
-    newSpikeTimes = events{handles.channelIndex, handles.unitIndex+1};
+%% Get data    
+%       events:         Timestamps for events (including sorted units) of all of the channels. 
+%                       Timestamps are returned as UINT32 representing a sample number at a sampling rate of 30 kHz
+%       time:           Time (in seconds) that the data buffer was most recently cleared.
+%       continuousData: An n x 3 cell array containing continuous sample data (typically LFP)
+%                       [channel number] [sample rate (in samples / s)] [values_vector]
+%                       Continuous data values are returned as signed 16bit integers (INT16),
+%                       and any digital values are unsigned 16bit integers (UINT16)
+    [events, timeElapsed, continuousData] = cbmex('trialdata',1);
+%% Get spike times and save in handles
+        newSpikeTimes = events(handles.electrodeChannels, 2:end); %events{handles.channelIndex, handles.unitIndex+1};
     % make sure it's a column vector
-    if size(newSpikeTimes,2) ~= 1
-        newSpikeTimes = newSpikeTimes';
-    end
-    newContinuousData = continuousData{handles.channelIndex,3};
-    handles.rawDataBuffer = cycleBuffer(handles.rawDataBuffer, newContinuousData);
-    handles.lastSampleProcTime = time*30000 + length(newContinuousData) - 1;
+%     if size(newSpikeTimes,2) ~= 1
+%         newSpikeTimes = newSpikeTimes';
+%     end
+    newContinuousData = continuousData(handles.electrodeChannels,3); %continuousData{handles.channelIndex,3};
+    handles.rawDataBuffer = cycleBuffer(handles.rawDataBuffer, newContinuousData{handles.channelIndex});
+    handles.lastSampleProcTime = timeElapsed*handles.rawSamplingRate + length(newContinuousData{handles.channelIndex}) - 1;
     
-    spikeTimes = [handles.unprocessedSpikes; newSpikeTimes];
+    spikeTimes = [handles.unprocessedSpikes; [newSpikeTimes{:}]];
     
     guidata(hfigure,handles)
     
     if ~isempty(spikeTimes)
         
-        %Compute PSTH
-        lastBin = binSize * ceil((trialNum-1)*(1000/(samplingRate*binSize)));
-        histEdges = 0 : binSize : lastBin;
-        timeValues = (mod(spikeTimes-1,numel(timeWindow))+1)*(1000/samplingRate);
-        PSTH = (histc(timeValues,histEdges)*1000) / (numTrials*binSize);
-        %Plot 
-        axes(h);
-        ph=bar(histEdges(1:end-1),PSTH(1:end-1),'histc');
-        set(ph,'edgecolor',h_color,'facecolor',h_color);
+        spikeTimes;
+%         %Compute PSTH
+%         lastBin = binSize * ceil((trialNum-1)*(1000/(samplingRate*binSize)));
+%         histEdges = 0 : binSize : lastBin;
+%         timeValues = (mod(spikeTimes-1,numel(timeWindow))+1)*(1000/samplingRate);
+%         PSTH = (histc(timeValues,histEdges)*1000) / (numTrials*binSize);
+%         %Plot 
+%         axes(h);
+%         ph=bar(histEdges(1:end-1),PSTH(1:end-1),'histc');
+%         set(ph,'edgecolor',h_color,'facecolor',h_color);
         
         
         %             set(handles.h_lfps, 'YData', handles.lfpAverage);
