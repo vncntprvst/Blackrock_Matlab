@@ -27,11 +27,11 @@ function varargout = PSTH(varargin)
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
 gui_State = struct('gui_Name',       mfilename, ...
-                   'gui_Singleton',  gui_Singleton, ...
-                   'gui_OpeningFcn', @PSTH_OpeningFcn, ...
-                   'gui_OutputFcn',  @PSTH_OutputFcn, ...
-                   'gui_LayoutFcn',  [] , ...
-                   'gui_Callback',   []);
+    'gui_Singleton',  gui_Singleton, ...
+    'gui_OpeningFcn', @PSTH_OpeningFcn, ...
+    'gui_OutputFcn',  @PSTH_OutputFcn, ...
+    'gui_LayoutFcn',  [] , ...
+    'gui_Callback',   []);
 if nargin && ischar(varargin{1})
     gui_State.gui_Callback = str2func(varargin{1});
 end
@@ -78,7 +78,7 @@ clear all
 
 
 % --- Outputs from this function are returned to the command line.
-function varargout = PSTH_OutputFcn(hObject, eventdata, handles) 
+function varargout = PSTH_OutputFcn(hObject, eventdata, handles)
 % varargout  cell array for returning output args (see VARARGOUT);
 % hObject    handle to figure
 % eventdata  reserved - to be defined in a future version of MATLAB
@@ -178,12 +178,12 @@ if get(hObject,'Value') == 0
     end
     
     set(hObject,'String','Stop');
-
+    
     % This starts the timer and also executes the StartFnc which grabs the
     % data, creates the buffer and plots the first bit of data
     start(handles.timer)
     
-% Stop
+    % Stop
 else
     set(hObject,'String','Start')
     stop(handles.timer)
@@ -288,7 +288,7 @@ try
     end
     
     [events, time, continuousData] = cbmex('trialdata',1);
-
+    
     newSpikeTimes = events{handles.channelIndex, handles.unitIndex+1};
     % make sure it's a column vector
     if size(newSpikeTimes,2) ~= 1
@@ -297,60 +297,71 @@ try
     newContinuousData = continuousData{handles.channelIndex,3};
     handles.rawDataBuffer = cycleBuffer(handles.rawDataBuffer, newContinuousData);
     handles.lastSampleProcTime = time*30000 + length(newContinuousData) - 1;
-
+    
     spikeTimes = [handles.unprocessedSpikes; newSpikeTimes];
-
+    
     guidata(hfigure,handles)
     
     if ~isempty(spikeTimes)
-
-%             set(handles.h_lfps, 'YData', handles.lfpAverage);
-            a = axis(handles.ax_allchan_rasters);
-%             set(handles.h_lfpN, 'Position',[(a(2)-a(1))*0.9+a(1), (a(4)-a(3))*0.9+a(3)], ...
-%                 'String', ['N = ' num2str(handles.numLfp)]);
+        
+        %Compute PSTH
+        lastBin = binSize * ceil((trialNum-1)*(1000/(samplingRate*binSize)));
+        histEdges = 0 : binSize : lastBin;
+        timeValues = (mod(spikeTimes-1,numel(timeWindow))+1)*(1000/samplingRate);
+        PSTH = (histc(timeValues,histEdges)*1000) / (numTrials*binSize);
+        %Plot 
+        axes(h);
+        ph=bar(histEdges(1:end-1),PSTH(1:end-1),'histc');
+        set(ph,'edgecolor',h_color,'facecolor',h_color);
+        
+        
+        %             set(handles.h_lfps, 'YData', handles.lfpAverage);
+        a = axis(handles.ax_allchan_rasters);
+        %             set(handles.h_lfpN, 'Position',[(a(2)-a(1))*0.9+a(1), (a(4)-a(3))*0.9+a(3)], ...
+        %                 'String', ['N = ' num2str(handles.numLfp)]);
     end
-   
-
-    % LFP display 
-%     if ~isempty(spikeTimes)
-%         [lfps, unprocessedEvents] = extractLfp(spikeTimes, hfigure);
-% 
-%         if ~isempty(lfps)
-%             % update the average LFP based on the previous average, the previous N
-%             % and the new waveforms and their quantity.  If there 'lfps' is
-%             % empty, the unprocessedEvents will get added to the list of
-%             % unprocessedSpikes field below and retried
-%             handles.lfpAverage = (handles.lfpAverage*handles.numLfp + sum(lfps,2)) / ...
-%                                   (handles.numLfp + size(lfps,2));
-%     %             handles.lfpMatrix = [handles.lfpMatrix, lfps];
-% 
-%             handles.numLfp = handles.numLfp + size(lfps,2);
-% 
-%     %         handles.averageLfp = mean(handles.lfpMatrix,2);
-%     %         handles.stdLfp = std(double(handles.lfpMatrix),[],2);      
-%     %         [lfpPatchX, lfpPatchY] = createPatchWaveform(handles.averageLfp, handles.stdLfp);
-%     %         set(handles.h_lfpPatch,'XData', lfpPatchX, 'YData', lfpPatchY);
-% 
-%             set(handles.h_lfps, 'YData', handles.lfpAverage);
-%             a = axis(handles.lfp);
-%             set(handles.h_lfpN, 'Position',[(a(2)-a(1))*0.9+a(1), (a(4)-a(3))*0.9+a(3)], ...
-%                 'String', ['N = ' num2str(handles.numLfp)]);
-% 
-%         end
-% 
-%         handles.unprocessedSpikes = unprocessedEvents;
-% 
-%     end
-
+    
+    
+    % LFP display
+    %     if ~isempty(spikeTimes)
+    %         [lfps, unprocessedEvents] = extractLfp(spikeTimes, hfigure);
+    %
+    %         if ~isempty(lfps)
+    %             % update the average LFP based on the previous average, the previous N
+    %             % and the new waveforms and their quantity.  If there 'lfps' is
+    %             % empty, the unprocessedEvents will get added to the list of
+    %             % unprocessedSpikes field below and retried
+    %             handles.lfpAverage = (handles.lfpAverage*handles.numLfp + sum(lfps,2)) / ...
+    %                                   (handles.numLfp + size(lfps,2));
+    %     %             handles.lfpMatrix = [handles.lfpMatrix, lfps];
+    %
+    %             handles.numLfp = handles.numLfp + size(lfps,2);
+    %
+    %     %         handles.averageLfp = mean(handles.lfpMatrix,2);
+    %     %         handles.stdLfp = std(double(handles.lfpMatrix),[],2);
+    %     %         [lfpPatchX, lfpPatchY] = createPatchWaveform(handles.averageLfp, handles.stdLfp);
+    %     %         set(handles.h_lfpPatch,'XData', lfpPatchX, 'YData', lfpPatchY);
+    %
+    %             set(handles.h_lfps, 'YData', handles.lfpAverage);
+    %             a = axis(handles.lfp);
+    %             set(handles.h_lfpN, 'Position',[(a(2)-a(1))*0.9+a(1), (a(4)-a(3))*0.9+a(3)], ...
+    %                 'String', ['N = ' num2str(handles.numLfp)]);
+    %
+    %         end
+    %
+    %         handles.unprocessedSpikes = unprocessedEvents;
+    %
+    %     end
+    
     % update YData of ax_rawData
     set(handles.h_rawDataTrace,'YData',handles.rawDataBuffer)
-
+    
     guidata(hfigure,handles)
-
+    
 catch ME
     getReport(ME)
 end
-    
+
 % ----------------------------------------------------------------------- %
 % ----                                                                --- %
 % ----                      Helper Functions                          --- %
@@ -361,46 +372,46 @@ end
 function  startTimer(hObject, eventdata, hfigure)
 try
     handles = guidata(hfigure);
-
+    
     % Create raw data buffer of zeros
     handles.rawDataBuffer = zeros(150000,1);
-
+    
     lfpTraceLength = (str2double(get(handles.txt_lfpPreSpike,'String')) + ...
-                     str2double(get(handles.txt_lfpPostSpike,'String'))) * 30 + 1;
+        str2double(get(handles.txt_lfpPostSpike,'String'))) * 30 + 1;
     handles.lfpAverage = zeros(lfpTraceLength,1);
     handles.lfpMatrix = [];
     handles.numLfp = 0;
-
+    
     % Check which channel is selected and get some data to plot
     handles.channelIndex = get(handles.pop_channels,'Value');
     handles.unitIndex = get(handles.pop_unit,'Value');
-
+    
     [events, time, continuousData] = cbmex('trialdata',1);
     newSpikeTimes = events{handles.channelIndex,handles.unitIndex+1};
     newContinuousData = continuousData{handles.channelIndex,3};
-
+    
     % keep track of the proc time of the most recent data point.  This will
     % help pull out chunks based off spike times.  'time' is the time at the
     % first data point of the new chunk of continuous data in seconds.
     handles.lastSampleProcTime = time*30000 + length(newContinuousData) - 1;
-
+    
     handles.rawDataBuffer = cycleBuffer(handles.rawDataBuffer, newContinuousData);
     handles.h_rawDataTrace = plot(handles.ax_selectedchan_rasters,handles.rawDataBuffer);
     handles.h_lfps = plot(handles.ax_allchan_rasters, handles.lfpAverage);
     a = axis(handles.ax_allchan_rasters);
     handles.h_lfpN = text((a(2)-a(1))*0.9+a(1), (a(4)-a(3))*0.9+a(3), ...
         'N = 0','Parent',handles.ax_allchan_rasters);
-
+    
     % create zeros patch plot for LFP.  Use handles.lfpAverage because it's a
     % zeros vector of the right size.
     % [XPatch, YPatch] = createPatchWaveform(handles.lfpAverage,handles.lfpAverage);
     % handles.h_lfpPatch = patch(XPatch,YPatch,'b');
-
+    
     % Unless the LFP window is super small, the first chunk of data won't be
     % big enough for extracting LFP around spikes.  Add any captured spikes to
     % the list of unprocessed spikes for later
     handles.unprocessedSpikes = newSpikeTimes;
-
+    
     guidata(hfigure,handles)
     
 catch ME
@@ -420,8 +431,8 @@ function [lfpMatrix, unprocessedEvents] = extractLfp(spikeTimes, hfigure)
 handles = guidata(hfigure);
 
 window = [str2double(get(handles.txt_lfpPreSpike,'String')), ...
-          str2double(get(handles.txt_lfpPostSpike,'String'))] * 30;
-      
+    str2double(get(handles.txt_lfpPostSpike,'String'))] * 30;
+
 unprocessedEvents = [];
 lfpMatrix = [];
 
@@ -448,9 +459,9 @@ for i = 1 : length(spikeTimes)
         end
         
         lfpMatrix = [lfpMatrix, ...
-                     handles.rawDataBuffer( ...
-                     (spikeTimes(i)-window(1):spikeTimes(i)+window(2)) - rawDataStart-1 ) ...
-                     ];
+            handles.rawDataBuffer( ...
+            (spikeTimes(i)-window(1):spikeTimes(i)+window(2)) - rawDataStart-1 ) ...
+            ];
     end
 end
 
