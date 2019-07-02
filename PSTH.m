@@ -22,7 +22,7 @@ function varargout = PSTH(varargin)
 
 % Edit the above text to modify the response to help PSTH
 
-% Last Modified by GUIDE v2.5 01-Jul-2019 20:08:44
+% Last Modified by GUIDE v2.5 02-Jul-2019 11:21:50
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -302,36 +302,45 @@ try
 
     guidata(hfigure,handles)
     
-
     if ~isempty(spikeTimes)
-        [lfps, unprocessedEvents] = extractLfp(spikeTimes, hfigure);
 
-        if ~isempty(lfps)
-            % update the average LFP based on the previous average, the previous N
-            % and the new waveforms and their quantity.  If there 'lfps' is
-            % empty, the unprocessedEvents will get added to the list of
-            % unprocessedSpikes field below and retried
-            handles.lfpAverage = (handles.lfpAverage*handles.numLfp + sum(lfps,2)) / ...
-                                  (handles.numLfp + size(lfps,2));
-    %             handles.lfpMatrix = [handles.lfpMatrix, lfps];
-
-            handles.numLfp = handles.numLfp + size(lfps,2);
-
-    %         handles.averageLfp = mean(handles.lfpMatrix,2);
-    %         handles.stdLfp = std(double(handles.lfpMatrix),[],2);      
-    %         [lfpPatchX, lfpPatchY] = createPatchWaveform(handles.averageLfp, handles.stdLfp);
-    %         set(handles.h_lfpPatch,'XData', lfpPatchX, 'YData', lfpPatchY);
-
-            set(handles.h_lfps, 'YData', handles.lfpAverage);
-            a = axis(handles.ax_rasters);
-            set(handles.h_lfpN, 'Position',[(a(2)-a(1))*0.9+a(1), (a(4)-a(3))*0.9+a(3)], ...
-                'String', ['N = ' num2str(handles.numLfp)]);
-
-        end
-
-        handles.unprocessedSpikes = unprocessedEvents;
-
+%             set(handles.h_lfps, 'YData', handles.lfpAverage);
+            a = axis(handles.ax_allchan_rasters);
+%             set(handles.h_lfpN, 'Position',[(a(2)-a(1))*0.9+a(1), (a(4)-a(3))*0.9+a(3)], ...
+%                 'String', ['N = ' num2str(handles.numLfp)]);
     end
+   
+
+    % LFP display 
+%     if ~isempty(spikeTimes)
+%         [lfps, unprocessedEvents] = extractLfp(spikeTimes, hfigure);
+% 
+%         if ~isempty(lfps)
+%             % update the average LFP based on the previous average, the previous N
+%             % and the new waveforms and their quantity.  If there 'lfps' is
+%             % empty, the unprocessedEvents will get added to the list of
+%             % unprocessedSpikes field below and retried
+%             handles.lfpAverage = (handles.lfpAverage*handles.numLfp + sum(lfps,2)) / ...
+%                                   (handles.numLfp + size(lfps,2));
+%     %             handles.lfpMatrix = [handles.lfpMatrix, lfps];
+% 
+%             handles.numLfp = handles.numLfp + size(lfps,2);
+% 
+%     %         handles.averageLfp = mean(handles.lfpMatrix,2);
+%     %         handles.stdLfp = std(double(handles.lfpMatrix),[],2);      
+%     %         [lfpPatchX, lfpPatchY] = createPatchWaveform(handles.averageLfp, handles.stdLfp);
+%     %         set(handles.h_lfpPatch,'XData', lfpPatchX, 'YData', lfpPatchY);
+% 
+%             set(handles.h_lfps, 'YData', handles.lfpAverage);
+%             a = axis(handles.lfp);
+%             set(handles.h_lfpN, 'Position',[(a(2)-a(1))*0.9+a(1), (a(4)-a(3))*0.9+a(3)], ...
+%                 'String', ['N = ' num2str(handles.numLfp)]);
+% 
+%         end
+% 
+%         handles.unprocessedSpikes = unprocessedEvents;
+% 
+%     end
 
     % update YData of ax_rawData
     set(handles.h_rawDataTrace,'YData',handles.rawDataBuffer)
@@ -376,11 +385,11 @@ try
     handles.lastSampleProcTime = time*30000 + length(newContinuousData) - 1;
 
     handles.rawDataBuffer = cycleBuffer(handles.rawDataBuffer, newContinuousData);
-    handles.h_rawDataTrace = plot(handles.ax_raw,handles.rawDataBuffer);
-    handles.h_lfps = plot(handles.ax_rasters, handles.lfpAverage);
-    a = axis(handles.ax_rasters);
+    handles.h_rawDataTrace = plot(handles.ax_selectedchan_rasters,handles.rawDataBuffer);
+    handles.h_lfps = plot(handles.ax_allchan_rasters, handles.lfpAverage);
+    a = axis(handles.ax_allchan_rasters);
     handles.h_lfpN = text((a(2)-a(1))*0.9+a(1), (a(4)-a(3))*0.9+a(3), ...
-        'N = 0','Parent',handles.ax_rasters);
+        'N = 0','Parent',handles.ax_allchan_rasters);
 
     % create zeros patch plot for LFP.  Use handles.lfpAverage because it's a
     % zeros vector of the right size.
@@ -405,7 +414,6 @@ if N >= length(oldBuffer)
 else
     newBuffer = [oldBuffer(N+1:end); newData];
 end
-
 
 function [lfpMatrix, unprocessedEvents] = extractLfp(spikeTimes, hfigure)
 
