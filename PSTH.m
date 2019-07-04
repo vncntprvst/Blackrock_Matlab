@@ -61,7 +61,7 @@ handles.output = hObject;
 % analysis/plotting
 handles.timer = timer(...
     'ExecutionMode', 'fixedRate', ...       % Run timer repeatedly
-    'Period', 0.5, ...                      % Initial period is 100 ms
+    'Period', 0.02, ...                      % Initial period is 5 ms (4 still fine, 3 starts to crash)
     'TimerFcn', {@updateDisplay,hObject}, ... % callback function.  Pass the figure handle
     'StartFcn', {@startTimer,hObject});     % callback to execute when timer starts
 
@@ -71,7 +71,7 @@ handles.cbmexStatus = 'closed';
 guidata(hObject, handles);
 
 clc
-clear all
+clearvars
 
 % UIWAIT makes PSTH wait for user response (see UIRESUME)
 % uiwait(handles.figure1);
@@ -119,7 +119,7 @@ pause(0.1)
 
 % Acquire some data to get channel information.  Determine which channels
 % are enabled
-[spikeEvents, time, continuousData] = cbmex('trialdata',1);
+[~, ~, continuousData] = cbmex('trialdata',1);
 handles.channelList = [continuousData{:,1}];
 % set channel popup meno to hold channels
 set(handles.pop_channels,'String',handles.channelList);
@@ -293,11 +293,12 @@ end
 % ----------------------------------------------------------------------- %
 function updateDisplay(hObject, eventdata, hfigure)
 try
-    
+ 
     handles = guidata(hfigure);
     if strcmp(handles.cbmexStatus,'closed')
         stop(handles.timer)
     end
+    
 %% Get data    
 %       events:         Timestamps for events (including sorted units) of all of the channels. 
 %                       Timestamps are returned as UINT32 representing a sample number at a sampling rate of 30 kHz
@@ -306,24 +307,39 @@ try
 %                       [channel number] [sample rate (in samples / s)] [values_vector]
 %                       Continuous data values are returned as signed 16bit integers (INT16),
 %                       and any digital values are unsigned 16bit integers (UINT16)
-    [events, timeElapsed, continuousData] = cbmex('trialdata',1);
+   tic
+%     [events, timeElapsed, continuousData] = 
+    cbmex('trialdata',1);
+    toc
+%     timeElapsed
 %% Get spike times and save in handles
-        newSpikeTimes = events(handles.electrodeChannels, 2:end); %events{handles.channelIndex, handles.unitIndex+1};
-    % make sure it's a column vector
-%     if size(newSpikeTimes,2) ~= 1
-%         newSpikeTimes = newSpikeTimes';
-%     end
-    newContinuousData = continuousData(handles.electrodeChannels,3); %continuousData{handles.channelIndex,3};
-    handles.rawDataBuffer = cycleBuffer(handles.rawDataBuffer, newContinuousData{handles.channelIndex});
-    handles.lastSampleProcTime = timeElapsed*handles.rawSamplingRate + length(newContinuousData{handles.channelIndex}) - 1;
+%         newSpikeTimes = events(handles.electrodeChannels, 2:end); %events{handles.channelIndex, handles.unitIndex+1};
+%     % make sure it's a column vector
+% %     if size(newSpikeTimes,2) ~= 1
+% %         newSpikeTimes = newSpikeTimes';
+% %     end
+%     newContinuousData = continuousData(handles.electrodeChannels,3); %continuousData{handles.channelIndex,3};
+%     handles.rawDataBuffer = cycleBuffer(handles.rawDataBuffer, newContinuousData{handles.channelIndex});
+%     handles.lastSampleProcTime = timeElapsed*handles.rawSamplingRate + length(newContinuousData{handles.channelIndex}) - 1;
+%     
+%     spikeTimes = [handles.unprocessedSpikes; unique(vertcat(newSpikeTimes{:}))];
+    spikeTimes=[];
+%     guidata(hfigure,handles)
     
-    spikeTimes = [handles.unprocessedSpikes; [newSpikeTimes{:}]];
-    
-    guidata(hfigure,handles)
+%         cmap=lines;
+%     plot(handles.ax_allchan_rasters,10,10,...
+%         'Marker' ,'o','MarkerSize',12,'MarkerFaceColor',cmap(randi([1 10]),:))
+        
     
     if ~isempty(spikeTimes)
         
-        spikeTimes;
+%         spikeTimes;
+        
+            %% testing plot performance at minimal buffer duration (min: 4ms)
+% %     axes(handles.ax_allchan_rasters)
+% %     cla
+
+        
 %         %Compute PSTH
 %         lastBin = binSize * ceil((trialNum-1)*(1000/(samplingRate*binSize)));
 %         histEdges = 0 : binSize : lastBin;
@@ -336,7 +352,7 @@ try
         
         
         %             set(handles.h_lfps, 'YData', handles.lfpAverage);
-        a = axis(handles.ax_allchan_rasters);
+%         a = axis(handles.ax_allchan_rasters);
         %             set(handles.h_lfpN, 'Position',[(a(2)-a(1))*0.9+a(1), (a(4)-a(3))*0.9+a(3)], ...
         %                 'String', ['N = ' num2str(handles.numLfp)]);
     end
