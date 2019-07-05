@@ -117,8 +117,7 @@ handles.cbmexStatus = 'open';
 cbmex('trialconfig',1,'absolute')
 pause(0.1)
 
-% Acquire some data to get channel information.  Determine which channels
-% are enabled
+% Acquire some data to get channel information.  Determine which channels are enabled
 [~, ~, continuousData] = cbmex('trialdata',1);
 handles.channelList = [continuousData{:,1}];
 % set channel popup meno to hold channels
@@ -127,6 +126,9 @@ set(handles.pop_channels,'String',handles.channelList);
 [handles.rawSamplingRate,handles.continuousSamplingRate]=deal(30000);
 handles.AIN_SamplingRate=1000;
 handles.electrodeChannels=handles.channelList(handles.channelList <= 64);
+handles.triggerChannel = 129; % AIN1 = 129; serial port = channel 152; digital = 151
+handles.cdTrigChan=[continuousData{:, 1}]==handles.triggerChannel;
+handles.AINthreshold=31000;
 % keep information about channels and set new values
 handles.initalChanConfig=cell(numel(handles.channelList),1);
 for chanNum=1:numel(handles.channelList)
@@ -293,66 +295,94 @@ end
 % ----------------------------------------------------------------------- %
 function updateDisplay(hObject, eventdata, hfigure)
 try
- 
+    
     handles = guidata(hfigure);
     if strcmp(handles.cbmexStatus,'closed')
         stop(handles.timer)
     end
     
-%% Get data    
-%       events:         Timestamps for events (including sorted units) of all of the channels. 
-%                       Timestamps are returned as UINT32 representing a sample number at a sampling rate of 30 kHz
-%       time:           Time (in seconds) that the data buffer was most recently cleared.
-%       continuousData: An n x 3 cell array containing continuous sample data (typically LFP)
-%                       [channel number] [sample rate (in samples / s)] [values_vector]
-%                       Continuous data values are returned as signed 16bit integers (INT16),
-%                       and any digital values are unsigned 16bit integers (UINT16)
-   tic
-%     [events, timeElapsed, continuousData] = 
-    cbmex('trialdata',1);
-    toc
-%     timeElapsed
-%% Get spike times and save in handles
-%         newSpikeTimes = events(handles.electrodeChannels, 2:end); %events{handles.channelIndex, handles.unitIndex+1};
-%     % make sure it's a column vector
-% %     if size(newSpikeTimes,2) ~= 1
-% %         newSpikeTimes = newSpikeTimes';
-% %     end
-%     newContinuousData = continuousData(handles.electrodeChannels,3); %continuousData{handles.channelIndex,3};
-%     handles.rawDataBuffer = cycleBuffer(handles.rawDataBuffer, newContinuousData{handles.channelIndex});
-%     handles.lastSampleProcTime = timeElapsed*handles.rawSamplingRate + length(newContinuousData{handles.channelIndex}) - 1;
-%     
-%     spikeTimes = [handles.unprocessedSpikes; unique(vertcat(newSpikeTimes{:}))];
-    spikeTimes=[];
-%     guidata(hfigure,handles)
+    %% Get data
+    %       events:         Timestamps for events (including sorted units) of all of the channels.
+    %                       Timestamps are returned as UINT32 representing a sample number at a sampling rate of 30 kHz
+    %       time:           Time (in seconds) that the data buffer was most recently cleared.
+    %       continuousData: An n x 3 cell array containing continuous sample data (typically LFP)
+    %                       [channel number] [sample rate (in samples / s)] [values_vector]
+    %                       Continuous data values are returned as signed 16bit integers (INT16),
+    %                       and any digital values are unsigned 16bit integers (UINT16)
     
-%         cmap=lines;
-%     plot(handles.ax_allchan_rasters,10,10,...
-%         'Marker' ,'o','MarkerSize',12,'MarkerFaceColor',cmap(randi([1 10]),:))
-        
+    % cbmex('trialdata') activation is strangely tied to the occurence of
+    % events (spikes, serial or digital inputs). Analog signals are not events.
+    % Currently (07/05/19), digital inputs induce packet lost, so no way to
+    % trigger cbmex that way. But, can be fixed, and that's no issue providing
+    % there are spikes (or artifacts) on spike channels.
+    %    tic
+    [eventsValues, timeElapsed, continuousData] = cbmex('trialdata',1);
+    %     toc
+    %     timeElapsed
+    %% Get spike times and save in handles
+    newSpikeTimes = eventsValues(handles.electrodeChannels, 2:end); %events{handles.channelIndex, handles.unitIndex+1};
+    %     % make sure it's a column vector
+    % %     if size(newSpikeTimes,2) ~= 1
+    % %         newSpikeTimes = newSpikeTimes';
+    % %     end
+    newContinuousData = continuousData(handles.electrodeChannels,3); %continuousData{handles.channelIndex,3};
+    handles.rawDataBuffer = cycleBuffer(handles.rawDataBuffer, newContinuousData{handles.channelIndex});
+    handles.lastSampleProcTime = timeElapsed*handles.rawSamplingRate + length(newContinuousData{handles.channelIndex}) - 1;
+    %
+    spikeTimes = [handles.unprocessedSpikes; unique(vertcat(newSpikeTimes{:}))];
+%     spikeTimes=[];
+    guidata(hfigure,handles)
+    %     Test plot
+    %     cmap=lines;
+    %     plot(handles.ax_allchan_rasters,10,10,...
+    %         'Marker' ,'o','MarkerSize',12,'MarkerFaceColor',cmap(randi([1 10]),:))
     
-    if ~isempty(spikeTimes)
-        
-%         spikeTimes;
-        
-            %% testing plot performance at minimal buffer duration (min: 4ms)
-% %     axes(handles.ax_allchan_rasters)
-% %     cla
+    %% get pulse time (if any)
+    % Analog chanel
+    foundTrig = [continuousData{handles.cdTrigChan, 3}]>handles.AINthreshold;
+    % Serial 
+%     foundTrig = (value == continuousData{handles.cdTrigChan, 3});
+    % Digital in
+%     foundTrig = ~isempty(continuousData{handles.cdTrigChan, 3});
+    
+    if ~isempty(foundTrig)
+        trigTime=find([continuousData{handles.cdTrigChan, 3}]>handles.AINthreshold,1);
+        %% testing plot performance at minimal buffer duration (min: 4ms)
+        % %             axes(handles.ax_allchan_rasters)
+        % %             cla
+        %             Test plot
+        %         cmap=lines;
+        %         plot(handles.ax_allchan_rasters,10,10,...
+        %             'Marker' ,'o','MarkerSize',12,'MarkerFaceColor',cmap(randi([1 10]),:))
+
+        %% plot continuous data
+        cla(handles.ax_allchan_rasters);
+        imagesc(handles.ax_allchan_rasters,horzcat(newContinuousData{:})');
+               
+        %% plot channel continuous data (to see spike waveform)
+        % accumulate n waveforms with decaying alpha
+        axes(handles.ax_selectedchan_wf); hold on
+        cla
+        startIndex=max([1 trigTime-30]); 
+        stopIndex=min([numel(newContinuousData{handles.channelIndex}) trigTime+60]); 
+        plot(handles.ax_selectedchan_wf,newContinuousData{handles.channelIndex}(startIndex:stopIndex));
+        plot(handles.ax_selectedchan_wf,continuousData{handles.cdTrigChan, 3}(startIndex:stopIndex)/100);
+        hold off
 
         
-%         %Compute PSTH
-%         lastBin = binSize * ceil((trialNum-1)*(1000/(samplingRate*binSize)));
-%         histEdges = 0 : binSize : lastBin;
-%         timeValues = (mod(spikeTimes-1,numel(timeWindow))+1)*(1000/samplingRate);
-%         PSTH = (histc(timeValues,histEdges)*1000) / (numTrials*binSize);
-%         %Plot 
-%         axes(h);
-%         ph=bar(histEdges(1:end-1),PSTH(1:end-1),'histc');
-%         set(ph,'edgecolor',h_color,'facecolor',h_color);
+        %% plot channel PSTH
+        %         lastBin = binSize * ceil((trialNum-1)*(1000/(samplingRate*binSize)));
+        %         histEdges = 0 : binSize : lastBin;
+        %         timeValues = (mod(spikeTimes-1,numel(timeWindow))+1)*(1000/samplingRate);
+        %         PSTH = (histc(timeValues,histEdges)*1000) / (numTrials*binSize);
+        %         %Plot
+        %         axes(h);
+        %         ph=bar(histEdges(1:end-1),PSTH(1:end-1),'histc');
+        %         set(ph,'edgecolor',h_color,'facecolor',h_color);
         
         
         %             set(handles.h_lfps, 'YData', handles.lfpAverage);
-%         a = axis(handles.ax_allchan_rasters);
+        %         a = axis(handles.ax_allchan_rasters);
         %             set(handles.h_lfpN, 'Position',[(a(2)-a(1))*0.9+a(1), (a(4)-a(3))*0.9+a(3)], ...
         %                 'String', ['N = ' num2str(handles.numLfp)]);
     end
